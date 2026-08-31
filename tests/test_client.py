@@ -8,7 +8,7 @@ import unittest
 from savior_client.config import ConfigurationError, Settings
 from savior_client.database import SqlServerManager
 from savior_client.models import InvalidPunch, Punch
-from savior_client.onehash import OneHashClient
+from savior_client.onehash import DeliveryError, OneHashClient
 from savior_client.runner import SaviorRunner
 
 
@@ -47,6 +47,26 @@ class ClientTests(unittest.TestCase):
         body = {"exception": "This employee already has a log with the same timestamp."}
         self.assertTrue(OneHashClient._is_duplicate(417, body))
         self.assertFalse(OneHashClient._is_duplicate(500, {"exception": "failure"}))
+
+    def test_server_timestamp_confirmation(self):
+        client = OneHashClient(self.settings())
+        punch = Punch(7, "KH0055", datetime(2026, 2, 4, 8, 56), "N")
+        client._confirm_result(
+            punch,
+            {
+                "message": {
+                    "protocol_version": 1,
+                    "created": True,
+                    "checkin": "TEST-CHECKIN",
+                    "timestamp": "2026-02-04 08:56:00",
+                }
+            },
+        )
+        with self.assertRaises(DeliveryError):
+            client._confirm_result(
+                punch,
+                {"message": {"timestamp": "2026-08-31 15:31:10"}},
+            )
 
     def test_custom_checkin_method_is_default(self):
         settings = self.settings()

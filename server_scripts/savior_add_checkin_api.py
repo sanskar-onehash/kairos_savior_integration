@@ -10,6 +10,8 @@ employee_code = str(employee_code).strip()
 if not employee_code:
     frappe.throw("Employee Code is required.")
 
+timestamp = frappe.utils.get_datetime(timestamp).replace(microsecond=0)
+
 if log_type:
     log_type = str(log_type).strip().upper()
     if log_type not in ["IN", "OUT"]:
@@ -28,14 +30,45 @@ if not employees:
 if len(employees) > 1:
     frappe.throw("More than one active Employee is mapped to the supplied EMP Code.")
 
-frappe.call(
-    "hrms.hr.doctype.employee_checkin.employee_checkin.add_log_based_on_employee_field",
-    employee_field_value=employees[0]["name"],
-    employee_fieldname="name",
-    timestamp=timestamp,
-    device_id=device_id,
-    log_type=log_type,
-    skip_auto_attendance=0
+employee = employees[0]["name"]
+normalized_log_type = log_type or ""
+existing = frappe.get_all(
+    "Employee Checkin",
+    filters={
+        "employee": employee,
+        "time": timestamp,
+        "log_type": normalized_log_type
+    },
+    fields=["name", "time", "log_type"],
+    limit_page_length=1
 )
 
-frappe.flags = {"result": {"created": True}}
+if existing:
+    frappe.flags = {
+        "protocol_version": 1,
+        "created": False,
+        "duplicate": True,
+        "checkin": existing[0]["name"],
+        "employee": employee,
+        "timestamp": str(existing[0]["time"]),
+        "log_type": existing[0]["log_type"] or ""
+    }
+else:
+    checkin = frappe.call(
+        "hrms.hr.doctype.employee_checkin.employee_checkin.add_log_based_on_employee_field",
+        employee_field_value=employee,
+        employee_fieldname="name",
+        timestamp=str(timestamp),
+        device_id=device_id,
+        log_type=log_type,
+        skip_auto_attendance=0
+    )
+    frappe.flags = {
+        "protocol_version": 1,
+        "created": True,
+        "duplicate": False,
+        "checkin": checkin.name,
+        "employee": employee,
+        "timestamp": str(checkin.time),
+        "log_type": checkin.log_type or ""
+    }
