@@ -6,14 +6,14 @@ import tempfile
 import unittest
 
 from savior_client.config import ConfigurationError, Settings
+from savior_client.database import SqlServerManager
 from savior_client.models import InvalidPunch, Punch
 from savior_client.onehash import OneHashClient
 from savior_client.runner import SaviorRunner
 
 
 ENV = """\
-SAVIOR_DB_USER=test
-SAVIOR_DB_PASSWORD=test
+SAVIOR_DB_SERVER=KH08\\SQLEXPRESS
 SAVIOR_DB_NAME=SAVIOR
 ONEHASH_URL=https://example.test
 ONEHASH_API_KEY=key
@@ -55,6 +55,12 @@ class ClientTests(unittest.TestCase):
             client.endpoint,
             "https://example.test/api/method/savior_add_employee_checkin",
         )
+
+    def test_sql_server_uses_trusted_connection(self):
+        connection_string = SqlServerManager(self.settings()).connection_string()
+        self.assertIn("SERVER={KH08\\SQLEXPRESS}", connection_string)
+        self.assertIn("Trusted_Connection=yes", connection_string)
+        self.assertNotIn("PWD=", connection_string)
 
     def test_https_is_required(self):
         with tempfile.TemporaryDirectory() as directory:

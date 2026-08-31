@@ -7,7 +7,7 @@ import logging
 from threading import Event
 
 from .config import Settings
-from .database import MySqlManager, PunchQueue
+from .database import PunchQueue, SqlServerManager
 from .models import InvalidPunch
 from .onehash import DeliveryError, OneHashClient, PermanentDeliveryError
 
@@ -29,7 +29,7 @@ class SaviorRunner:
 
     @classmethod
     def build(cls, settings: Settings) -> "SaviorRunner":
-        manager = MySqlManager(settings)
+        manager = SqlServerManager(settings)
         return cls(settings, PunchQueue(manager, settings), OneHashClient(settings))
 
     def prepare(self) -> None:

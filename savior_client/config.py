@@ -66,11 +66,15 @@ def _optional_datetime(raw: str, name: str) -> datetime | None:
 
 @dataclass(frozen=True)
 class Settings:
-    db_host: str
-    db_port: int
+    db_server: str
+    db_driver: str
+    db_trusted_connection: bool
+    db_encrypt: bool
+    db_trust_server_certificate: bool
     db_user: str
     db_password: str
     db_name: str
+    db_schema: str
     source_table: str
     queue_table: str
     trigger_name: str
@@ -94,11 +98,28 @@ class Settings:
         path = env_file or Path(__file__).resolve().parents[1] / ".env"
         values = _read_env_file(path)
         settings = cls(
-            db_host=_value(values, "SAVIOR_DB_HOST", "host", default="127.0.0.1"),
-            db_port=_positive_int(_value(values, "SAVIOR_DB_PORT", default="3306"), "SAVIOR_DB_PORT"),
-            db_user=_value(values, "SAVIOR_DB_USER", "user"),
-            db_password=_value(values, "SAVIOR_DB_PASSWORD", "password"),
-            db_name=_value(values, "SAVIOR_DB_NAME", "database"),
+            db_server=_value(values, "SAVIOR_DB_SERVER"),
+            db_driver=_value(
+                values,
+                "SAVIOR_DB_DRIVER",
+                default="ODBC Driver 18 for SQL Server",
+            ),
+            db_trusted_connection=_boolean(
+                _value(values, "SAVIOR_DB_TRUSTED_CONNECTION", default="true"),
+                "SAVIOR_DB_TRUSTED_CONNECTION",
+            ),
+            db_encrypt=_boolean(
+                _value(values, "SAVIOR_DB_ENCRYPT", default="true"),
+                "SAVIOR_DB_ENCRYPT",
+            ),
+            db_trust_server_certificate=_boolean(
+                _value(values, "SAVIOR_DB_TRUST_SERVER_CERTIFICATE", default="true"),
+                "SAVIOR_DB_TRUST_SERVER_CERTIFICATE",
+            ),
+            db_user=_value(values, "SAVIOR_DB_USER"),
+            db_password=_value(values, "SAVIOR_DB_PASSWORD"),
+            db_name=_value(values, "SAVIOR_DB_NAME"),
+            db_schema=_value(values, "SAVIOR_DB_SCHEMA", default="dbo"),
             source_table=_value(values, "SAVIOR_SOURCE_TABLE", default="machinerawpunch"),
             queue_table=_value(values, "SAVIOR_QUEUE_TABLE", default="onehash_db_changes"),
             trigger_name=_value(values, "SAVIOR_TRIGGER_NAME", default="log_onehash_task"),
@@ -136,8 +157,7 @@ class Settings:
 
     def validate(self) -> None:
         required = {
-            "SAVIOR_DB_USER": self.db_user,
-            "SAVIOR_DB_PASSWORD": self.db_password,
+            "SAVIOR_DB_SERVER": self.db_server,
             "SAVIOR_DB_NAME": self.db_name,
             "ONEHASH_URL": self.erp_url,
             "ONEHASH_API_KEY": self.erp_api_key,
@@ -146,6 +166,14 @@ class Settings:
         missing = [name for name, value in required.items() if not value]
         if missing:
             raise ConfigurationError("Missing required settings: " + ", ".join(missing))
+        if not self.db_trusted_connection and not self.db_user:
+            raise ConfigurationError(
+                "SAVIOR_DB_USER is required when SAVIOR_DB_TRUSTED_CONNECTION is false"
+            )
+        if not self.db_trusted_connection and not self.db_password:
+            raise ConfigurationError(
+                "SAVIOR_DB_PASSWORD is required when SAVIOR_DB_TRUSTED_CONNECTION is false"
+            )
         if not self.erp_url.startswith("https://"):
             raise ConfigurationError("ONEHASH_URL must use HTTPS")
         if not all(part.isidentifier() for part in self.checkin_method.split(".")):
