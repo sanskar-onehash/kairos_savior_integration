@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+import shutil
+import sys
 
 import servicemanager
 import win32event
@@ -45,4 +48,26 @@ class OneHashSaviorService(win32serviceutil.ServiceFramework):
 
 
 def handle_command_line() -> None:
-    win32serviceutil.HandleCommandLine(OneHashSaviorService)
+    project_root = Path(__file__).resolve().parents[1]
+    if any(command in sys.argv[1:] for command in ("install", "update")):
+        service_executable = Path(sys.prefix) / "pythonservice.exe"
+        dll_directory = Path(win32service.__file__).resolve().parent.parent / "pywin32_system32"
+        python_tag = f"{sys.version_info.major}{sys.version_info.minor}"
+        service_dlls = (
+            dll_directory / f"pywintypes{python_tag}.dll",
+            dll_directory / f"pythoncom{python_tag}.dll",
+            Path(sys.base_prefix) / f"python{python_tag}.dll",
+        )
+        for source in service_dlls:
+            if not source.is_file():
+                raise RuntimeError(f"Required pywin32 service DLL not found: {source}")
+            target = service_executable.parent / source.name
+            if source.resolve() != target.resolve():
+                shutil.copy2(source, target)
+    service_class = str(
+        project_root / "savior_client.windows_service.OneHashSaviorService"
+    )
+    win32serviceutil.HandleCommandLine(
+        OneHashSaviorService,
+        serviceClassString=service_class,
+    )
