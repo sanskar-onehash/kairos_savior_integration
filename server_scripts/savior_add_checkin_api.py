@@ -62,6 +62,7 @@ else:
         "log_type": log_type or None,
         "skip_auto_attendance": 0
     })
+    doc.flags.ignore_permlevel_for_fields = ["time"]
     doc.insert()
     stored_timestamp = frappe.utils.get_datetime(doc.time).replace(microsecond=0)
     if stored_timestamp != timestamp:
