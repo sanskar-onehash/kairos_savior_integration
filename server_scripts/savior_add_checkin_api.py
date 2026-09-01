@@ -54,21 +54,24 @@ if existing:
         "log_type": existing[0]["log_type"] or ""
     }
 else:
-    checkin = frappe.call(
-        "hrms.hr.doctype.employee_checkin.employee_checkin.add_log_based_on_employee_field",
-        employee_field_value=employee,
-        employee_fieldname="name",
-        timestamp=str(timestamp),
-        device_id=device_id,
-        log_type=log_type,
-        skip_auto_attendance=0
-    )
+    doc = frappe.get_doc({
+        "doctype": "Employee Checkin",
+        "employee": employee,
+        "time": timestamp,
+        "device_id": device_id,
+        "log_type": log_type or None,
+        "skip_auto_attendance": 0
+    })
+    doc.insert()
+    stored_timestamp = frappe.utils.get_datetime(doc.time).replace(microsecond=0)
+    if stored_timestamp != timestamp:
+        frappe.throw("Stored Employee Checkin timestamp does not match the supplied timestamp.")
     frappe.flags = {
         "protocol_version": 1,
         "created": True,
         "duplicate": False,
-        "checkin": checkin.name,
+        "checkin": doc.name,
         "employee": employee,
-        "timestamp": str(checkin.time),
-        "log_type": checkin.log_type or ""
+        "timestamp": str(stored_timestamp),
+        "log_type": doc.log_type or ""
     }
